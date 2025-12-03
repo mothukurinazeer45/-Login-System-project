@@ -1,0 +1,196 @@
+import tkinter as tk
+from tkinter import messagebox
+import hashlib
+import os
+
+USER_FILE = "users.txt"
+
+# -----------------------------
+# Hash password
+# -----------------------------
+def hash_password(password):
+    return hashlib.sha256(password.encode()).hexdigest()
+
+# -----------------------------
+# Load all users
+# Format: username:passwordhash:securityQ:securityAhash
+# -----------------------------
+def load_users():
+    users = {}
+    if os.path.exists(USER_FILE):
+        with open(USER_FILE, "r") as f:
+            for line in f:
+                parts = line.strip().split(":")
+                if len(parts) == 4:
+                    username, pw_hash, secQ, secA_hash = parts
+                    users[username] = {
+                        "password": pw_hash,
+                        "question": secQ,
+                        "answer": secA_hash
+                    }
+    return users
+
+# -----------------------------
+# Save a new user
+# -----------------------------
+def save_user(username, password, secQ, secA):
+    with open(USER_FILE, "a") as f:
+        f.write(f"{username}:{hash_password(password)}:{secQ}:{hash_password(secA)}\n")
+
+# -----------------------------
+# Update user password
+# -----------------------------
+def update_password(username, new_password):
+    users = load_users()
+    users[username]["password"] = hash_password(new_password)
+
+    with open(USER_FILE, "w") as f:
+        for user, data in users.items():
+            f.write(f"{user}:{data['password']}:{data['question']}:{data['answer']}\n")
+
+# -----------------------------
+# Register User
+# -----------------------------
+def register_user():
+    username = reg_username.get()
+    password = reg_password.get()
+    secQ = reg_secQ.get()
+    secA = reg_secA.get()
+
+    if username == "" or password == "" or secQ == "" or secA == "":
+        messagebox.showwarning("Error", "All fields are required!")
+        return
+
+    users = load_users()
+
+    if username in users:
+        messagebox.showerror("Error", "Username already exists!")
+        return
+
+    save_user(username, password, secQ, secA)
+    messagebox.showinfo("Success", "Registration Successful!")
+    register_window.destroy()
+
+# -----------------------------
+# Login User
+# -----------------------------
+def login_user():
+    username = login_username.get()
+    password = login_password.get()
+
+    users = load_users()
+    hashed = hash_password(password)
+
+    if username in users and users[username]["password"] == hashed:
+        messagebox.showinfo("Success", f"Welcome {username}!")
+    else:
+        messagebox.showerror("Error", "Invalid Username or Password")
+
+# -----------------------------
+# Forgot Password Window
+# -----------------------------
+def forgot_password_window():
+    global forgot_win, fp_username, fp_answer, fp_newpass
+
+    forgot_win = tk.Toplevel(root)
+    forgot_win.title("Forgot Password")
+    forgot_win.geometry("320x300")
+
+    tk.Label(forgot_win, text="Forgot Password", font=("Arial", 16)).pack(pady=10)
+
+    tk.Label(forgot_win, text="Enter Username").pack()
+    fp_username = tk.Entry(forgot_win)
+    fp_username.pack()
+
+    tk.Button(forgot_win, text="Next", command=load_security_question).pack(pady=10)
+
+def load_security_question():
+    global fp_question_label, fp_answer, fp_newpass
+
+    username = fp_username.get()
+    users = load_users()
+
+    if username not in users:
+        messagebox.showerror("Error", "User not found")
+        return
+
+    tk.Label(forgot_win, text="Security Question:").pack()
+    fp_question_label = tk.Label(forgot_win, text=users[username]["question"], fg="blue")
+    fp_question_label.pack()
+
+    tk.Label(forgot_win, text="Your Answer").pack()
+    fp_answer = tk.Entry(forgot_win)
+    fp_answer.pack()
+
+    tk.Label(forgot_win, text="New Password").pack()
+    fp_newpass = tk.Entry(forgot_win, show="*")
+    fp_newpass.pack()
+
+    tk.Button(forgot_win, text="Reset Password", command=reset_password).pack(pady=10)
+
+def reset_password():
+    username = fp_username.get()
+    answer = fp_answer.get()
+    new_password = fp_newpass.get()
+
+    users = load_users()
+
+    if hash_password(answer) == users[username]["answer"]:
+        update_password(username, new_password)
+        messagebox.showinfo("Success", "Password Reset Successful!")
+        forgot_win.destroy()
+    else:
+        messagebox.showerror("Error", "Security Answer Incorrect!")
+
+# -----------------------------
+# Register Window
+# -----------------------------
+def open_register_window():
+    global register_window, reg_username, reg_password, reg_secQ, reg_secA
+
+    register_window = tk.Toplevel(root)
+    register_window.title("Register")
+    register_window.geometry("350x350")
+
+    tk.Label(register_window, text="Create Account", font=("Arial", 16)).pack(pady=10)
+
+    tk.Label(register_window, text="Username").pack()
+    reg_username = tk.Entry(register_window)
+    reg_username.pack()
+
+    tk.Label(register_window, text="Password").pack()
+    reg_password = tk.Entry(register_window, show="*")
+    reg_password.pack()
+
+    tk.Label(register_window, text="Security Question").pack()
+    reg_secQ = tk.Entry(register_window)
+    reg_secQ.pack()
+
+    tk.Label(register_window, text="Security Answer").pack()
+    reg_secA = tk.Entry(register_window)
+    reg_secA.pack()
+
+    tk.Button(register_window, text="Register", command=register_user).pack(pady=10)
+
+# -----------------------------
+# Main Login Window
+# -----------------------------
+root = tk.Tk()
+root.title("Enhanced Login System")
+root.geometry("350x350")
+
+tk.Label(root, text="Login System", font=("Arial", 20)).pack(pady=20)
+
+tk.Label(root, text="Username").pack()
+login_username = tk.Entry(root)
+login_username.pack()
+
+tk.Label(root, text="Password").pack()
+login_password = tk.Entry(root, show="*")
+login_password.pack()
+
+tk.Button(root, text="Login", width=10, command=login_user).pack(pady=10)
+tk.Button(root, text="Register", width=10, command=open_register_window).pack()
+tk.Button(root, text="Forgot Password?", width=15, command=forgot_password_window).pack(pady=10)
+
+root.mainloop()
